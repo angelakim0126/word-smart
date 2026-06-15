@@ -95,7 +95,7 @@ h1 {
 #name2:focus, #p2-card .score-name { color: var(--p2); }
 
 .mode-picker {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 22px;
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 22px;
 }
 .mode {
   background: var(--bg-1);
@@ -151,9 +151,87 @@ h1 {
   border: 1px solid var(--card-line);
 }
 .btn--ghost:hover { border-color: var(--accent); color: var(--accent); }
+.btn--sm { padding: 8px 14px; font-size: 0.88rem; }
 
 .word-count {
   color: var(--ink-faint); font-size: 0.85rem; margin: 16px 0 0;
+}
+
+/* ------ Learn (flashcards) ------ */
+.learn-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 14px; margin-bottom: 20px;
+}
+.learn-progress { flex: 1; display: flex; flex-direction: column; gap: 6px; align-items: center; }
+.learn-progress__track {
+  width: 100%; max-width: 360px; height: 8px;
+  background: var(--bg-1); border: 1px solid var(--card-line);
+  border-radius: 999px; overflow: hidden;
+}
+.learn-progress__fill {
+  height: 100%; width: 0%;
+  background: linear-gradient(90deg, var(--accent), #ffb347);
+  border-radius: 999px; transition: width 0.3s ease;
+}
+.learn-progress__label { font-size: 0.82rem; color: var(--ink-faint); font-weight: 700; }
+
+.flashcard {
+  perspective: 1200px;
+  cursor: pointer;
+  margin: 0 auto 22px;
+  max-width: 680px;
+}
+.flashcard__inner {
+  position: relative;
+  width: 100%; min-height: 260px;
+  transform-style: preserve-3d;
+  transition: transform 0.5s cubic-bezier(0.3, 0.8, 0.4, 1);
+}
+.flashcard.flipped .flashcard__inner { transform: rotateY(180deg); }
+.flashcard__face {
+  position: absolute; inset: 0;
+  -webkit-backface-visibility: hidden; backface-visibility: hidden;
+  background: var(--card); border: 1px solid var(--card-line);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+  padding: 36px 28px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 14px; text-align: center;
+}
+.flashcard__back { transform: rotateY(180deg); }
+.flashcard__label {
+  font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.16em;
+  color: var(--ink-faint); font-weight: 800;
+}
+.flashcard__text {
+  font-family: 'Helvetica Neue', system-ui, sans-serif;
+  font-weight: 900; font-style: italic;
+  font-size: clamp(2rem, 6vw, 3.2rem); line-height: 1.05;
+  letter-spacing: -0.01em;
+}
+.flashcard__text--def {
+  font-style: normal; font-weight: 700;
+  font-size: clamp(1.3rem, 4vw, 1.9rem); line-height: 1.35;
+}
+.flashcard__back .flashcard__label { color: var(--accent); }
+.flashcard__hint {
+  position: absolute; bottom: 16px; left: 0; right: 0;
+  font-size: 0.8rem; color: var(--ink-faint); font-weight: 600;
+}
+
+.learn-rating {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+  max-width: 680px; margin: 0 auto;
+  opacity: 0.35; pointer-events: none; transition: opacity 0.2s;
+}
+.flashcard.flipped ~ .learn-rating { opacity: 1; pointer-events: auto; }
+.rate { color: #fff; }
+.rate--learning { background: var(--accent); }
+.rate--learning:hover { background: #ff6a1f; }
+.rate--known { background: var(--right); }
+.rate--known:hover { background: #2bbd86; }
+.learn-tip {
+  text-align: center; color: var(--ink-faint); font-size: 0.85rem;
+  max-width: 560px; margin: 16px auto 0; line-height: 1.5; min-height: 1em;
 }
 
 .recent {
