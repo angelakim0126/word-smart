@@ -255,7 +255,6 @@ h1 {
   font-size: 1.4rem; letter-spacing: -0.01em;
 }
 .sets-sub { margin: 2px 0 0; color: var(--ink-faint); font-size: 0.85rem; }
-.sets-actions { display: flex; gap: 8px; flex-shrink: 0; }
 .set-grid {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: 12px; max-width: 760px; margin: 8px auto 0;
@@ -535,9 +534,4 @@ footer {
   .target-mid { display: none; }
   .clock-head { grid-template-columns: 1fr 1fr; }
   .clock-score { grid-column: span 2; text-align: center; }
-  /* Set-picker header: stack title above the buttons so nothing crowds. */
-  #screen-learn-sets .learn-bar { flex-wrap: wrap; gap: 10px; }
-  #screen-learn-sets .sets-head { order: -1; flex-basis: 100%; }
-  .sets-title { font-size: 1.2rem; }
-  .set-grid { grid-template-columns: 1fr 1fr; }
 }

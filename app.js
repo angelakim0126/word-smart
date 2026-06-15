@@ -18,7 +18,6 @@
     learnDir:  "ws_learn_dir",
     setSize:   "ws_set_size",
     setProg:   "ws_set_progress",
-    wordOrder: "ws_word_order",
   };
   const get = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : v; } catch { return d; } };
   const set = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
@@ -560,31 +559,10 @@
   function loadMastered() { return new Set(getJSON(LS.mastered, [])); }
   function saveMastered(setObj) { setJSON(LS.mastered, [...setObj]); }
 
-  // Pool in a saved random order, so sets are mixed (not alphabetical) but
-  // stable across sessions. Regenerates if the word pool changed.
-  function buildOrderedPool() {
-    const pool = loadWordPool();
-    const order = getJSON(LS.wordOrder, null);
-    if (Array.isArray(order) && order.length === pool.length) {
-      const byWord = new Map(pool.map(w => [w.word, w]));
-      const mapped = order.map(wd => byWord.get(wd)).filter(Boolean);
-      if (mapped.length === pool.length) return { pool: mapped, regenerated: false };
-    }
-    const shuffled = shuffle(pool);
-    setJSON(LS.wordOrder, shuffled.map(w => w.word));
-    return { pool: shuffled, regenerated: true };
-  }
-
-  // Re-randomize the sets on demand. Resets per-set scores (indices remap to
-  // different words); keeps per-word "mastered" marks.
-  function regenerateOrder() {
-    const shuffled = shuffle(loadWordPool());
-    setJSON(LS.wordOrder, shuffled.map(w => w.word));
-    learn.pool = shuffled;
-    learn.sets = buildSets(learn.pool, learn.size);
-    learn.prog = { size: learn.size, best: {} };
-    setJSON(LS.setProg, learn.prog);
-    renderSetPicker();
+  // Pool sorted alphabetically so set membership is stable across sessions.
+  function sortedPool() {
+    return loadWordPool().slice()
+      .sort((a, b) => a.word.toLowerCase().localeCompare(b.word.toLowerCase()));
   }
   function buildSets(pool, size) {
     const sets = [];
@@ -615,14 +593,11 @@
 
   function startLearn() {
     learn.size = setup.setSize;
-    const { pool, regenerated } = buildOrderedPool();
-    learn.pool = pool;
+    learn.pool = sortedPool();
     learn.sets = buildSets(learn.pool, learn.size);
     learn.mastered = loadMastered();
     learn.dir = get(LS.learnDir, "w2d");
     learn.prog = loadSetProg();
-    // If the order was (re)generated, old per-set scores no longer match.
-    if (regenerated) { learn.prog = { size: learn.size, best: {} }; setJSON(LS.setProg, learn.prog); }
     showSetPicker();
   }
 
@@ -821,10 +796,6 @@
     // Set picker
     $("sets-done").addEventListener("click", () => {
       renderRecent(); updateWordCount(); showScreen("screen-setup");
-    });
-    $("sets-shuffle").addEventListener("click", () => {
-      if (!confirm("Shuffle into new random sets? This resets set scores.")) return;
-      regenerateOrder();
     });
     $("sets-reset").addEventListener("click", () => {
       if (!confirm("Reset all set scores and 'mastered' marks?")) return;
