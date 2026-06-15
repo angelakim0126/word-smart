@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Vocabulary Study — Dad vs. George</title>
-  <link rel="stylesheet" href="styles.css?v=3" />
+  <link rel="stylesheet" href="styles.css?v=4" />
 </head>
 <body>
 
@@ -49,6 +49,13 @@
         <button class="target target--active" data-target="10">10</button>
         <button class="target" data-target="15">15</button>
         <button class="target" data-target="20">20</button>
+      </div>
+
+      <div id="learn-options" class="options" style="display:none;">
+        <span class="opt-label">Words per set</span>
+        <button class="setsize setsize--active" data-size="10">10</button>
+        <button class="setsize" data-size="15">15</button>
+        <button class="setsize" data-size="20">20</button>
       </div>
 
       <div class="setup-actions">
@@ -113,13 +120,26 @@
     </div>
   </section>
 
-  <!-- ============ LEARN (FLASHCARD) SCREEN ============ -->
+  <!-- ============ LEARN — SET PICKER ============ -->
+  <section id="screen-learn-sets" class="screen">
+    <div class="learn-bar">
+      <button id="sets-done" class="btn btn--ghost btn--sm">← Done</button>
+      <div class="sets-head">
+        <h2 class="sets-title">Word Sets</h2>
+        <p class="sets-sub" id="sets-sub">Study a set, then test it.</p>
+      </div>
+      <button id="sets-reset" class="btn btn--ghost btn--sm">Reset</button>
+    </div>
+    <div class="set-grid" id="set-grid"></div>
+  </section>
+
+  <!-- ============ LEARN — FLASHCARD STUDY ============ -->
   <section id="screen-learn" class="screen">
     <div class="learn-bar">
-      <button id="learn-quit" class="btn btn--ghost btn--sm">← Done</button>
+      <button id="learn-back-sets" class="btn btn--ghost btn--sm">← Sets</button>
       <div class="learn-progress">
         <div class="learn-progress__track"><div class="learn-progress__fill" id="learn-fill"></div></div>
-        <span class="learn-progress__label" id="learn-progress-label">Mastered 0 / 0</span>
+        <span class="learn-progress__label" id="learn-progress-label">Set 1 · studied 0 / 10</span>
       </div>
       <button id="learn-dir" class="btn btn--ghost btn--sm" title="Switch direction">Word → Def</button>
     </div>
@@ -142,20 +162,45 @@
       <button class="btn rate rate--learning" id="rate-learning">Still learning</button>
       <button class="btn rate rate--known" id="rate-known">Knew it ✓</button>
     </div>
-    <p class="learn-tip" id="learn-tip">Words you mark "still learning" come back around. Mastered words drop to the back.</p>
+    <p class="learn-tip" id="learn-tip">Mark “still learning” to see a word again. When you’re ready, test the set.</p>
+    <div class="learn-test-cta">
+      <button id="learn-test-btn" class="btn btn--primary">Test this set →</button>
+    </div>
   </section>
 
-  <!-- ============ LEARN SESSION COMPLETE ============ -->
-  <section id="screen-learn-done" class="screen">
-    <div class="handoff-card">
-      <div class="handoff-eyebrow">Study session</div>
-      <h2 id="learn-done-title">🎓 Nice work!</h2>
-      <p id="learn-done-detail" class="handoff-detail"></p>
-      <div class="result-actions">
-        <button id="learn-again" class="btn btn--primary">Study again</button>
-        <button id="learn-home" class="btn btn--ghost">Back to setup</button>
+  <!-- ============ LEARN — SET TEST ============ -->
+  <section id="screen-learn-test" class="screen">
+    <div class="learn-bar">
+      <button id="test-quit" class="btn btn--ghost btn--sm">← Sets</button>
+      <div class="learn-progress">
+        <div class="learn-progress__track"><div class="learn-progress__fill" id="test-fill"></div></div>
+        <span class="learn-progress__label" id="test-progress-label">Set 1 · Question 1 / 10</span>
       </div>
-      <button id="learn-reset" class="btn btn--ghost btn--sm" style="margin-top:14px;">Reset all progress</button>
+      <div class="test-score">Score <span id="test-score">0</span></div>
+    </div>
+
+    <div class="word-stage">
+      <div class="word-prompt" id="test-word">—</div>
+      <div class="answers" id="test-answers"></div>
+      <div class="feedback" id="test-feedback"></div>
+    </div>
+  </section>
+
+  <!-- ============ LEARN — SET RESULT ============ -->
+  <section id="screen-learn-done" class="screen">
+    <canvas id="learn-confetti"></canvas>
+    <div class="result-card">
+      <div class="result-eyebrow" id="learn-done-eyebrow">Set 1</div>
+      <h2 id="learn-done-title">🎓 9 / 10</h2>
+      <p id="learn-done-detail" class="result-detail"></p>
+      <div class="result-actions">
+        <button id="learn-next-set" class="btn btn--primary">Next set →</button>
+        <button id="learn-retake" class="btn btn--ghost">Retake test</button>
+      </div>
+      <div class="result-actions" style="margin-top:10px;">
+        <button id="learn-restudy" class="btn btn--ghost">Study this set again</button>
+        <button id="learn-all-sets" class="btn btn--ghost">All sets</button>
+      </div>
     </div>
   </section>
 
@@ -211,6 +256,6 @@ sesquipedalian — given to using long words
   </footer>
 
   <script src="words.js?v=1"></script>
-  <script src="app.js?v=2"></script>
+  <script src="app.js?v=3"></script>
 </body>
 </html>

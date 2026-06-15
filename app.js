@@ -16,6 +16,8 @@
     history:   "ws_history",
     mastered:  "ws_learn_mastered",
     learnDir:  "ws_learn_dir",
+    setSize:   "ws_set_size",
+    setProg:   "ws_set_progress",
   };
   const get = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : v; } catch { return d; } };
   const set = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
@@ -68,6 +70,7 @@
   const setup = {
     mode: get(LS.mode, "duel"),
     target: parseInt(get(LS.target, "10"), 10),
+    setSize: parseInt(get(LS.setSize, "10"), 10),
   };
 
   function initSetup() {
@@ -95,6 +98,17 @@
       });
     });
 
+    // Set size (Learn mode)
+    document.querySelectorAll(".setsize").forEach(b => {
+      const s = parseInt(b.dataset.size, 10);
+      b.classList.toggle("setsize--active", s === setup.setSize);
+      b.addEventListener("click", () => {
+        setup.setSize = s;
+        set(LS.setSize, String(s));
+        document.querySelectorAll(".setsize").forEach(x => x.classList.toggle("setsize--active", x === b));
+      });
+    });
+
     $("btn-start").addEventListener("click", startMatch);
     $("btn-edit-words").addEventListener("click", openEditor);
 
@@ -106,6 +120,7 @@
   function applyModeUI() {
     const isLearn = setup.mode === "learn";
     $("duel-options").style.display = setup.mode === "duel" ? "flex" : "none";
+    $("learn-options").style.display = isLearn ? "flex" : "none";
     document.querySelector(".players").style.display = isLearn ? "none" : "grid";
     $("btn-start").textContent = isLearn ? "Start studying →" : "Start match →";
   }
@@ -435,8 +450,8 @@
   }
 
   // ---------- Confetti ----------
-  function launchConfetti() {
-    const c = $("confetti");
+  function launchConfetti(canvasId = "confetti") {
+    const c = $(canvasId);
     const ctx = c.getContext("2d");
     c.width = window.innerWidth; c.height = window.innerHeight;
     const colors = ["#fa5400", "#38bdf8", "#34d399", "#fbbf24", "#a78bfa", "#ff5dd2"];
@@ -529,51 +544,114 @@
   // ============================================================
   // LEARN MODE (solo flashcards)
   // ============================================================
+  const LEARN_PASS = 0.8; // fraction of a set's test needed to "pass" it
+
   const learn = {
-    pool: [], queue: [], mastered: new Set(),
-    dir: "w2d",        // "w2d" word→def, "d2w" def→word
-    current: null, flipped: false, sessionMastered: 0,
+    size: 10, pool: [], sets: [], setIdx: 0,
+    dir: "w2d",            // "w2d" word→def, "d2w" def→word
+    mastered: new Set(), prog: { size: 10, best: {} },
+    // study state
+    queue: [], current: null, flipped: false, setSeen: new Set(),
+    // test state
+    testQs: [], testIdx: 0, testScore: 0, testLocked: false,
   };
 
-  function loadMastered() {
-    return new Set(getJSON(LS.mastered, []));
+  function loadMastered() { return new Set(getJSON(LS.mastered, [])); }
+  function saveMastered(setObj) { setJSON(LS.mastered, [...setObj]); }
+
+  // Pool sorted alphabetically so set membership is stable across sessions.
+  function sortedPool() {
+    return loadWordPool().slice()
+      .sort((a, b) => a.word.toLowerCase().localeCompare(b.word.toLowerCase()));
   }
-  function saveMastered(setObj) {
-    setJSON(LS.mastered, [...setObj]);
+  function buildSets(pool, size) {
+    const sets = [];
+    for (let i = 0; i < pool.length; i += size) sets.push(pool.slice(i, i + size));
+    return sets;
+  }
+
+  // Per-set best test scores. Reset if the chosen set size changed.
+  function loadSetProg() {
+    const raw = getJSON(LS.setProg, null);
+    if (!raw || raw.size !== learn.size) return { size: learn.size, best: {} };
+    return raw;
+  }
+  function saveSetBest(idx, score) {
+    const prev = learn.prog.best[idx] || 0;
+    if (score > prev) learn.prog.best[idx] = score;
+    learn.prog.size = learn.size;
+    setJSON(LS.setProg, learn.prog);
+  }
+  function setPassed(idx) {
+    const size = learn.sets[idx] ? learn.sets[idx].length : 0;
+    return size > 0 && (learn.prog.best[idx] || 0) / size >= LEARN_PASS;
+  }
+  function firstUnpassedSet() {
+    for (let i = 0; i < learn.sets.length; i++) if (!setPassed(i)) return i;
+    return 0;
   }
 
   function startLearn() {
-    learn.pool = loadWordPool();
+    learn.size = setup.setSize;
+    learn.pool = sortedPool();
+    learn.sets = buildSets(learn.pool, learn.size);
     learn.mastered = loadMastered();
     learn.dir = get(LS.learnDir, "w2d");
-    learn.sessionMastered = 0;
-    buildLearnQueue();
-    if (!learn.queue.length) { learn.queue = shuffle(learn.pool.slice()); }
+    learn.prog = loadSetProg();
+    showSetPicker();
+  }
+
+  function showSetPicker() {
+    renderSetPicker();
+    showScreen("screen-learn-sets");
+  }
+
+  function renderSetPicker() {
+    const grid = $("set-grid");
+    grid.innerHTML = "";
+    const currentIdx = firstUnpassedSet();
+    learn.sets.forEach((words, i) => {
+      const size = words.length;
+      const best = learn.prog.best[i] || 0;
+      const passed = setPassed(i);
+      const tile = document.createElement("button");
+      tile.className = "set-tile"
+        + (passed ? " set-tile--passed" : "")
+        + (!passed && i === currentIdx ? " set-tile--current" : "");
+      const status = best
+        ? (passed ? `✓ ${best} / ${size}` : `Best ${best} / ${size}`)
+        : (i === currentIdx ? "▶ Start here" : "Not started");
+      tile.innerHTML =
+        `<span class="set-tile__name">Set ${i + 1}</span>` +
+        `<span class="set-tile__range">${escapeHtml(words[0].word)} … ${escapeHtml(words[size - 1].word)}</span>` +
+        `<span class="set-tile__status">${status}</span>`;
+      tile.addEventListener("click", () => studySet(i));
+      grid.appendChild(tile);
+    });
+    const passedCount = learn.sets.filter((_, i) => setPassed(i)).length;
+    $("sets-sub").textContent =
+      `${learn.sets.length} sets · ${learn.pool.length} words · ${passedCount} passed`;
+  }
+
+  // ---- Study a set (flashcards) ----
+  function studySet(idx) {
+    learn.setIdx = idx;
+    learn.setSeen = new Set();
+    learn.queue = buildStudyQueue(learn.sets[idx]);
     $("learn-dir").textContent = learn.dir === "w2d" ? "Word → Def" : "Def → Word";
     showScreen("screen-learn");
     nextCard();
   }
-
-  // Unmastered words first (shuffled), then mastered (shuffled) for review.
-  function buildLearnQueue() {
-    const unmastered = [], known = [];
-    for (const w of learn.pool) {
-      (learn.mastered.has(w.word) ? known : unmastered).push(w);
-    }
-    learn.queue = [...shuffle(unmastered), ...shuffle(known)];
+  function buildStudyQueue(words) {
+    const un = [], kn = [];
+    for (const w of words) (learn.mastered.has(w.word) ? kn : un).push(w);
+    return [...shuffle(un), ...shuffle(kn)];
   }
-
-  function masteredInPool() {
-    let n = 0;
-    for (const w of learn.pool) if (learn.mastered.has(w.word)) n++;
-    return n;
-  }
-
-  function renderLearnProgress() {
-    const total = learn.pool.length;
-    const m = masteredInPool();
-    $("learn-fill").style.width = total ? `${(m / total) * 100}%` : "0%";
-    $("learn-progress-label").textContent = `Mastered ${m} / ${total}`;
+  function updateStudyProgress() {
+    const size = learn.sets[learn.setIdx].length;
+    const seen = Math.min(learn.setSeen.size, size);
+    $("learn-fill").style.width = size ? `${(seen / size) * 100}%` : "0%";
+    $("learn-progress-label").textContent = `Set ${learn.setIdx + 1} · studied ${seen} / ${size}`;
   }
 
   function setFlipped(state) {
@@ -582,7 +660,7 @@
   }
 
   function nextCard() {
-    if (!learn.queue.length) return finishLearn();
+    if (!learn.queue.length) learn.queue = buildStudyQueue(learn.sets[learn.setIdx]);
     learn.current = learn.queue.shift();
     setFlipped(false);
     const w = learn.current;
@@ -597,40 +675,111 @@
       $("learn-back-label").textContent = "WORD";
       $("learn-back").textContent = w.word;
     }
-    $("learn-tip").textContent = learn.mastered.has(w.word)
-      ? "You've mastered this one — quick review."
-      : "Words you mark “still learning” come back around. Mastered words drop to the back.";
-    renderLearnProgress();
+    const size = learn.sets[learn.setIdx].length;
+    $("learn-tip").textContent = learn.setSeen.size >= size
+      ? "You've been through the whole set — ready to test it?"
+      : "Mark “still learning” to see a word again, or test the set when ready.";
+    updateStudyProgress();
   }
 
   function rate(known) {
     if (!learn.current) return;
     const w = learn.current;
+    learn.setSeen.add(w.word);
     if (known) {
-      if (!learn.mastered.has(w.word)) learn.sessionMastered++;
       learn.mastered.add(w.word);
       saveMastered(learn.mastered);
     } else {
       learn.mastered.delete(w.word);
       saveMastered(learn.mastered);
-      // Re-queue ~6 cards ahead so it recurs this session.
-      const pos = Math.min(6, learn.queue.length);
+      // Re-queue a few cards ahead so it recurs this session.
+      const pos = Math.min(3, learn.queue.length);
       learn.queue.splice(pos, 0, w);
     }
     nextCard();
   }
 
-  function finishLearn() {
-    const m = masteredInPool();
-    const total = learn.pool.length;
-    $("learn-done-title").textContent = m >= total ? "🏆 All mastered!" : "🎓 Nice work!";
-    $("learn-done-detail").textContent =
-      `You mastered ${learn.sessionMastered} new word${learn.sessionMastered === 1 ? "" : "s"} this session. ` +
-      `Total mastered: ${m} of ${total}.`;
+  // ---- Test a set (multiple choice) ----
+  function testSet(idx) {
+    learn.setIdx = idx;
+    learn.testQs = shuffle(learn.sets[idx]).map(w => ({
+      word: w.word,
+      def: w.def,
+      choices: shuffle([w.def, ...pickN(learn.pool, 3, w).map(x => x.def)]),
+    }));
+    learn.testIdx = 0;
+    learn.testScore = 0;
+    learn.testLocked = false;
+    $("test-score").textContent = "0";
+    showScreen("screen-learn-test");
+    renderTestQ();
+  }
+
+  function renderTestQ() {
+    learn.testLocked = false;
+    const q = learn.testQs[learn.testIdx];
+    const total = learn.testQs.length;
+    $("test-progress-label").textContent = `Set ${learn.setIdx + 1} · Question ${learn.testIdx + 1} / ${total}`;
+    $("test-fill").style.width = `${(learn.testIdx / total) * 100}%`;
+    $("test-word").textContent = q.word;
+    $("test-feedback").textContent = "";
+    $("test-feedback").className = "feedback";
+    const answers = $("test-answers");
+    answers.innerHTML = "";
+    q.choices.forEach(c => {
+      const b = document.createElement("button");
+      b.className = "answer";
+      b.textContent = c;
+      b.addEventListener("click", () => learnTestAnswer(b, c, q.def));
+      answers.appendChild(b);
+    });
+  }
+
+  function learnTestAnswer(btn, choice, correctDef) {
+    if (learn.testLocked) return;
+    learn.testLocked = true;
+    const correct = choice === correctDef;
+    document.querySelectorAll("#test-answers .answer").forEach(b => {
+      b.disabled = true;
+      if (b.textContent === correctDef) b.classList.add("right");
+    });
+    if (!correct) btn.classList.add("wrong");
+    if (correct) {
+      learn.testScore++;
+      $("test-score").textContent = String(learn.testScore);
+      $("test-feedback").textContent = "Correct!";
+      $("test-feedback").className = "feedback good";
+    } else {
+      $("test-feedback").textContent = "Nope";
+      $("test-feedback").className = "feedback bad";
+    }
+    setTimeout(() => {
+      learn.testIdx++;
+      if (learn.testIdx >= learn.testQs.length) finishSetTest();
+      else renderTestQ();
+    }, correct ? 700 : 1200);
+  }
+
+  function finishSetTest() {
+    const total = learn.testQs.length;
+    const score = learn.testScore;
+    const passed = score / total >= LEARN_PASS;
+    saveSetBest(learn.setIdx, score);
+    $("test-fill").style.width = "100%";
+    const isLast = learn.setIdx >= learn.sets.length - 1;
+    $("learn-done-eyebrow").textContent = `Set ${learn.setIdx + 1} · ${total} words`;
+    $("learn-done-title").textContent = `${passed ? "✅" : "📚"} ${score} / ${total}`;
+    $("learn-done-detail").textContent = passed
+      ? (isLast ? "You passed the final set — you've been through them all! 🎉"
+                : "Passed! On to the next set?")
+      : `You need ${Math.ceil(LEARN_PASS * total)} of ${total} to pass. Study this set and retake.`;
+    $("learn-next-set").style.display = isLast ? "none" : "";
     showScreen("screen-learn-done");
+    if (passed) launchConfetti("learn-confetti");
   }
 
   function bindLearn() {
+    // Study: flip + rate
     $("learn-card").addEventListener("click", () => setFlipped(!learn.flipped));
     $("rate-known").addEventListener("click", () => { if (learn.flipped) rate(true); });
     $("rate-learning").addEventListener("click", () => { if (learn.flipped) rate(false); });
@@ -641,25 +790,40 @@
       // Re-render current card face with new direction (don't lose place).
       if (learn.current) { learn.queue.unshift(learn.current); nextCard(); }
     });
-    $("learn-quit").addEventListener("click", () => {
+    $("learn-back-sets").addEventListener("click", showSetPicker);
+    $("learn-test-btn").addEventListener("click", () => testSet(learn.setIdx));
+
+    // Set picker
+    $("sets-done").addEventListener("click", () => {
       renderRecent(); updateWordCount(); showScreen("screen-setup");
     });
-    $("learn-again").addEventListener("click", startLearn);
-    $("learn-home").addEventListener("click", () => {
-      renderRecent(); updateWordCount(); showScreen("screen-setup");
-    });
-    $("learn-reset").addEventListener("click", () => {
-      if (!confirm("Reset all 'mastered' progress?")) return;
+    $("sets-reset").addEventListener("click", () => {
+      if (!confirm("Reset all set scores and 'mastered' marks?")) return;
+      learn.prog = { size: learn.size, best: {} };
+      setJSON(LS.setProg, learn.prog);
       learn.mastered = new Set();
       saveMastered(learn.mastered);
-      startLearn();
+      renderSetPicker();
     });
-    // Keyboard: space/enter flips; 1 = still learning, 2 = knew it.
+
+    // Test
+    $("test-quit").addEventListener("click", showSetPicker);
+
+    // Result
+    $("learn-next-set").addEventListener("click", () => {
+      const next = Math.min(learn.setIdx + 1, learn.sets.length - 1);
+      studySet(next);
+    });
+    $("learn-retake").addEventListener("click", () => testSet(learn.setIdx));
+    $("learn-restudy").addEventListener("click", () => studySet(learn.setIdx));
+    $("learn-all-sets").addEventListener("click", showSetPicker);
+
+    // Keyboard (study screen only): space/enter flips, 1 = still learning, 2 = knew it
     document.addEventListener("keydown", (e) => {
       if (!$("screen-learn").classList.contains("screen--active")) return;
       if (e.key === " " || e.key === "Enter") { e.preventDefault(); setFlipped(!learn.flipped); }
-      else if (learn.flipped && (e.key === "1")) rate(false);
-      else if (learn.flipped && (e.key === "2")) rate(true);
+      else if (learn.flipped && e.key === "1") rate(false);
+      else if (learn.flipped && e.key === "2") rate(true);
     });
   }
 
