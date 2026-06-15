@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Word Smart — Dad vs. George</title>
+  <link rel="stylesheet" href="styles.css?v=2" />
+</head>
+<body>
+
+  <!-- ============ SETUP SCREEN ============ -->
+  <section id="screen-setup" class="screen screen--active">
+    <header class="hero">
+      <a class="back-link" href="https://angelakim0126.github.io/gaminghub/">← Game Hub</a>
+      <h1>Word Smart</h1>
+      <p class="tagline">Battle of the vocabulary. Pick a mode, name the rivals, may the bigger brain win.</p>
+    </header>
+
+    <div class="setup-card">
+      <div class="players">
+        <label>
+          <span class="lbl">Player 1</span>
+          <input id="name1" type="text" maxlength="14" autocomplete="off" />
+        </label>
+        <span class="vs">vs</span>
+        <label>
+          <span class="lbl">Player 2</span>
+          <input id="name2" type="text" maxlength="14" autocomplete="off" />
+        </label>
+      </div>
+
+      <div class="mode-picker">
+        <button class="mode mode--active" data-mode="duel">
+          <span class="mode__title">Duel</span>
+          <span class="mode__sub">Turn-based · first to target wins</span>
+        </button>
+        <button class="mode" data-mode="clock">
+          <span class="mode__title">Beat-the-Clock</span>
+          <span class="mode__sub">60 seconds each · highest score wins</span>
+        </button>
+      </div>
+
+      <div id="duel-options" class="options">
+        <span class="opt-label">First to</span>
+        <button class="target target--active" data-target="10">10</button>
+        <button class="target" data-target="15">15</button>
+        <button class="target" data-target="20">20</button>
+      </div>
+
+      <div class="setup-actions">
+        <button id="btn-start" class="btn btn--primary">Start match →</button>
+        <button id="btn-edit-words" class="btn btn--ghost">Edit word list</button>
+      </div>
+
+      <p class="word-count" id="word-count"></p>
+    </div>
+
+    <div class="recent" id="recent-section" hidden>
+      <h3>Recent matches</h3>
+      <ul id="recent-list"></ul>
+    </div>
+  </section>
+
+  <!-- ============ DUEL SCREEN ============ -->
+  <section id="screen-duel" class="screen">
+    <div class="duel-scoreboard">
+      <div class="score-card" id="p1-card">
+        <div class="score-name" id="p1-name">Player 1</div>
+        <div class="score-num" id="p1-score">0</div>
+        <div class="score-streak" id="p1-streak"></div>
+      </div>
+      <div class="target-mid" id="target-mid">first to 10</div>
+      <div class="score-card" id="p2-card">
+        <div class="score-name" id="p2-name">Player 2</div>
+        <div class="score-num" id="p2-score">0</div>
+        <div class="score-streak" id="p2-streak"></div>
+      </div>
+    </div>
+
+    <div class="turn-banner" id="turn-banner">Player 1's turn</div>
+
+    <div class="word-stage">
+      <div class="word-prompt" id="duel-word">—</div>
+      <div class="answers" id="duel-answers"></div>
+      <div class="feedback" id="duel-feedback"></div>
+    </div>
+
+    <div class="duel-actions">
+      <button id="duel-quit" class="btn btn--ghost">Quit match</button>
+    </div>
+  </section>
+
+  <!-- ============ BEAT-THE-CLOCK SCREEN ============ -->
+  <section id="screen-clock" class="screen">
+    <div class="clock-head">
+      <div class="clock-player" id="clock-player">Player 1</div>
+      <div class="clock-timer" id="clock-timer">60</div>
+      <div class="clock-score">Score: <span id="clock-score">0</span></div>
+    </div>
+
+    <div class="word-stage">
+      <div class="word-prompt" id="clock-word">—</div>
+      <div class="answers" id="clock-answers"></div>
+      <div class="feedback" id="clock-feedback"></div>
+    </div>
+
+    <div class="duel-actions">
+      <button id="clock-quit" class="btn btn--ghost">Quit match</button>
+    </div>
+  </section>
+
+  <!-- ============ CLOCK HANDOFF / RESULT SCREEN ============ -->
+  <section id="screen-handoff" class="screen">
+    <div class="handoff-card">
+      <div class="handoff-eyebrow" id="handoff-eyebrow">Round 1 complete</div>
+      <h2 id="handoff-title">Pass the device</h2>
+      <p id="handoff-detail" class="handoff-detail"></p>
+      <button id="handoff-go" class="btn btn--primary">I'm ready →</button>
+    </div>
+  </section>
+
+  <!-- ============ RESULT SCREEN ============ -->
+  <section id="screen-result" class="screen">
+    <canvas id="confetti"></canvas>
+    <div class="result-card">
+      <div class="result-eyebrow" id="result-eyebrow">Match over</div>
+      <h2 id="result-headline">🏆 Winner</h2>
+      <div class="result-scores" id="result-scores"></div>
+      <p class="result-detail" id="result-detail"></p>
+      <div class="result-actions">
+        <button id="btn-rematch" class="btn btn--primary">Rematch</button>
+        <button id="btn-home" class="btn btn--ghost">Back to setup</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ WORD EDITOR MODAL ============ -->
+  <div id="editor-modal" class="modal" hidden>
+    <div class="modal__sheet">
+      <button class="modal__close" id="editor-close" aria-label="Close">×</button>
+      <h2>Word list editor</h2>
+      <p class="editor-help">Paste words and definitions, one per line. Use a colon, dash, or tab between word and definition. Lines starting with <code>#</code> are ignored.</p>
+      <textarea id="editor-textarea" placeholder="obstreperous: noisy and difficult to control
+sesquipedalian — given to using long words
+# you can write comments like this"></textarea>
+      <label class="editor-toggle">
+        <input type="checkbox" id="editor-custom-only" />
+        <span>Use only my custom words (ignore the starter pack)</span>
+      </label>
+      <div class="editor-stats" id="editor-stats"></div>
+      <div class="editor-actions">
+        <button class="btn btn--ghost" id="editor-clear">Clear custom list</button>
+        <button class="btn btn--primary" id="editor-save">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <p>Built with <a href="https://claude.com/claude-code" target="_blank" rel="noopener">Claude Code</a> · <a href="https://angelakim0126.github.io/gaminghub/">Angela's Game Hub</a></p>
+    <p class="disclaimer">Personal, non-commercial fan project · Not affiliated with Princeton Review or my employer · "Word Smart" is a registered trademark of its respective owner; this game does not include book content.</p>
+  </footer>
+
+  <script src="words.js?v=1"></script>
+  <script src="app.js?v=1"></script>
+</body>
+</html>
