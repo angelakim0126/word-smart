@@ -1,5 +1,6 @@
 /* Word Smart — Dad vs. George
- * Two modes: Duel (turn-based first-to-N) and Beat-the-Clock (60s solo, compare).
+ * Modes: Duel (turn-based first-to-N), Beat-the-Clock (60s solo, compare),
+ *        Learn (solo flashcard study with mastery tracking).
  */
 (() => {
   "use strict";
@@ -13,6 +14,8 @@
     custom:    "ws_custom_words",
     customOnly:"ws_use_custom_only",
     history:   "ws_history",
+    mastered:  "ws_learn_mastered",
+    learnDir:  "ws_learn_dir",
   };
   const get = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : v; } catch { return d; } };
   const set = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
@@ -77,10 +80,10 @@
         setup.mode = b.dataset.mode;
         set(LS.mode, setup.mode);
         document.querySelectorAll(".mode").forEach(x => x.classList.toggle("mode--active", x === b));
-        $("duel-options").style.display = setup.mode === "duel" ? "flex" : "none";
+        applyModeUI();
       });
     });
-    $("duel-options").style.display = setup.mode === "duel" ? "flex" : "none";
+    applyModeUI();
     // Target
     document.querySelectorAll(".target").forEach(b => {
       const t = parseInt(b.dataset.target, 10);
@@ -97,6 +100,14 @@
 
     updateWordCount();
     renderRecent();
+  }
+
+  // Show/hide setup elements based on the selected mode.
+  function applyModeUI() {
+    const isLearn = setup.mode === "learn";
+    $("duel-options").style.display = setup.mode === "duel" ? "flex" : "none";
+    document.querySelector(".players").style.display = isLearn ? "none" : "grid";
+    $("btn-start").textContent = isLearn ? "Start studying →" : "Start match →";
   }
 
   function updateWordCount() {
@@ -143,6 +154,7 @@
 
   // ---------- Match start ----------
   function startMatch() {
+    if (setup.mode === "learn") return startLearn();
     const n1 = ($("name1").value.trim() || "Player 1").slice(0, 14);
     const n2 = ($("name2").value.trim() || "Player 2").slice(0, 14);
     set(LS.p1, n1); set(LS.p2, n2);
@@ -514,10 +526,148 @@
     };
   }
 
+  // ============================================================
+  // LEARN MODE (solo flashcards)
+  // ============================================================
+  const learn = {
+    pool: [], queue: [], mastered: new Set(),
+    dir: "w2d",        // "w2d" word→def, "d2w" def→word
+    current: null, flipped: false, sessionMastered: 0,
+  };
+
+  function loadMastered() {
+    return new Set(getJSON(LS.mastered, []));
+  }
+  function saveMastered(setObj) {
+    setJSON(LS.mastered, [...setObj]);
+  }
+
+  function startLearn() {
+    learn.pool = loadWordPool();
+    learn.mastered = loadMastered();
+    learn.dir = get(LS.learnDir, "w2d");
+    learn.sessionMastered = 0;
+    buildLearnQueue();
+    if (!learn.queue.length) { learn.queue = shuffle(learn.pool.slice()); }
+    $("learn-dir").textContent = learn.dir === "w2d" ? "Word → Def" : "Def → Word";
+    showScreen("screen-learn");
+    nextCard();
+  }
+
+  // Unmastered words first (shuffled), then mastered (shuffled) for review.
+  function buildLearnQueue() {
+    const unmastered = [], known = [];
+    for (const w of learn.pool) {
+      (learn.mastered.has(w.word) ? known : unmastered).push(w);
+    }
+    learn.queue = [...shuffle(unmastered), ...shuffle(known)];
+  }
+
+  function masteredInPool() {
+    let n = 0;
+    for (const w of learn.pool) if (learn.mastered.has(w.word)) n++;
+    return n;
+  }
+
+  function renderLearnProgress() {
+    const total = learn.pool.length;
+    const m = masteredInPool();
+    $("learn-fill").style.width = total ? `${(m / total) * 100}%` : "0%";
+    $("learn-progress-label").textContent = `Mastered ${m} / ${total}`;
+  }
+
+  function setFlipped(state) {
+    learn.flipped = state;
+    $("learn-card").classList.toggle("flipped", state);
+  }
+
+  function nextCard() {
+    if (!learn.queue.length) return finishLearn();
+    learn.current = learn.queue.shift();
+    setFlipped(false);
+    const w = learn.current;
+    if (learn.dir === "w2d") {
+      $("learn-front-label").textContent = "WORD";
+      $("learn-front").textContent = w.word;
+      $("learn-back-label").textContent = "DEFINITION";
+      $("learn-back").textContent = w.def;
+    } else {
+      $("learn-front-label").textContent = "DEFINITION";
+      $("learn-front").textContent = w.def;
+      $("learn-back-label").textContent = "WORD";
+      $("learn-back").textContent = w.word;
+    }
+    $("learn-tip").textContent = learn.mastered.has(w.word)
+      ? "You've mastered this one — quick review."
+      : "Words you mark “still learning” come back around. Mastered words drop to the back.";
+    renderLearnProgress();
+  }
+
+  function rate(known) {
+    if (!learn.current) return;
+    const w = learn.current;
+    if (known) {
+      if (!learn.mastered.has(w.word)) learn.sessionMastered++;
+      learn.mastered.add(w.word);
+      saveMastered(learn.mastered);
+    } else {
+      learn.mastered.delete(w.word);
+      saveMastered(learn.mastered);
+      // Re-queue ~6 cards ahead so it recurs this session.
+      const pos = Math.min(6, learn.queue.length);
+      learn.queue.splice(pos, 0, w);
+    }
+    nextCard();
+  }
+
+  function finishLearn() {
+    const m = masteredInPool();
+    const total = learn.pool.length;
+    $("learn-done-title").textContent = m >= total ? "🏆 All mastered!" : "🎓 Nice work!";
+    $("learn-done-detail").textContent =
+      `You mastered ${learn.sessionMastered} new word${learn.sessionMastered === 1 ? "" : "s"} this session. ` +
+      `Total mastered: ${m} of ${total}.`;
+    showScreen("screen-learn-done");
+  }
+
+  function bindLearn() {
+    $("learn-card").addEventListener("click", () => setFlipped(!learn.flipped));
+    $("rate-known").addEventListener("click", () => { if (learn.flipped) rate(true); });
+    $("rate-learning").addEventListener("click", () => { if (learn.flipped) rate(false); });
+    $("learn-dir").addEventListener("click", () => {
+      learn.dir = learn.dir === "w2d" ? "d2w" : "w2d";
+      set(LS.learnDir, learn.dir);
+      $("learn-dir").textContent = learn.dir === "w2d" ? "Word → Def" : "Def → Word";
+      // Re-render current card face with new direction (don't lose place).
+      if (learn.current) { learn.queue.unshift(learn.current); nextCard(); }
+    });
+    $("learn-quit").addEventListener("click", () => {
+      renderRecent(); updateWordCount(); showScreen("screen-setup");
+    });
+    $("learn-again").addEventListener("click", startLearn);
+    $("learn-home").addEventListener("click", () => {
+      renderRecent(); updateWordCount(); showScreen("screen-setup");
+    });
+    $("learn-reset").addEventListener("click", () => {
+      if (!confirm("Reset all 'mastered' progress?")) return;
+      learn.mastered = new Set();
+      saveMastered(learn.mastered);
+      startLearn();
+    });
+    // Keyboard: space/enter flips; 1 = still learning, 2 = knew it.
+    document.addEventListener("keydown", (e) => {
+      if (!$("screen-learn").classList.contains("screen--active")) return;
+      if (e.key === " " || e.key === "Enter") { e.preventDefault(); setFlipped(!learn.flipped); }
+      else if (learn.flipped && (e.key === "1")) rate(false);
+      else if (learn.flipped && (e.key === "2")) rate(true);
+    });
+  }
+
   // ---------- Init ----------
   document.addEventListener("DOMContentLoaded", () => {
     initSetup();
     bindEditor();
+    bindLearn();
   });
 
 })();
