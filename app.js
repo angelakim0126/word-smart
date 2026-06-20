@@ -37,7 +37,7 @@
       const key = (w.word || "").trim().toLowerCase();
       if (!key || !w.def || seen.has(key)) continue;
       seen.add(key);
-      out.push({ word: w.word.trim(), def: w.def.trim() });
+      out.push({ word: w.word.trim(), def: w.def.trim(), sentence: (w.sentence || "").trim() });
     }
     return out;
   }
@@ -664,16 +664,21 @@
     learn.current = learn.queue.shift();
     setFlipped(false);
     const w = learn.current;
+    const sentenceText = w.sentence ? `“${w.sentence}”` : "";
     if (learn.dir === "w2d") {
       $("learn-front-label").textContent = "WORD";
       $("learn-front").textContent = w.word;
+      $("learn-front-sentence").textContent = "";
       $("learn-back-label").textContent = "DEFINITION";
       $("learn-back").textContent = w.def;
+      $("learn-back-sentence").textContent = sentenceText;
     } else {
       $("learn-front-label").textContent = "DEFINITION";
       $("learn-front").textContent = w.def;
+      $("learn-front-sentence").textContent = sentenceText;
       $("learn-back-label").textContent = "WORD";
       $("learn-back").textContent = w.word;
+      $("learn-back-sentence").textContent = "";
     }
     const size = learn.sets[learn.setIdx].length;
     $("learn-tip").textContent = learn.setSeen.size >= size

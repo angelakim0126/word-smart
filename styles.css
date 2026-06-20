@@ -226,6 +226,16 @@ h1 {
   font-size: clamp(1.3rem, 4vw, 1.9rem); line-height: 1.35;
 }
 .flashcard__back .flashcard__label { color: var(--accent); }
+.flashcard__sentence {
+  margin-top: 14px;
+  padding: 0 18px;
+  font-size: clamp(0.92rem, 2.4vw, 1.05rem);
+  font-style: italic;
+  font-weight: 500;
+  color: var(--ink-soft, rgba(0,0,0,0.55));
+  line-height: 1.45;
+  max-width: 90%;
+}
 .flashcard__hint {
   position: absolute; bottom: 16px; left: 0; right: 0;
   font-size: 0.8rem; color: var(--ink-faint); font-weight: 600;
